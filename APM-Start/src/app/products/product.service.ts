@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
-import { Observable, throwError } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
+import { combineLatest, Observable, throwError } from 'rxjs';
+import { catchError, tap, map } from 'rxjs/operators';
 
 import { Product } from './product';
+import { ProductCategoryService } from '../product-categories/product-category.service';
 import { Supplier } from '../suppliers/supplier';
 import { SupplierService } from '../suppliers/supplier.service';
 
@@ -14,17 +15,31 @@ import { SupplierService } from '../suppliers/supplier.service';
 export class ProductService {
   private productsUrl = 'api/products';
   private suppliersUrl = this.supplierService.suppliersUrl;
+  products$ = this.http.get<Product[]>(this.productsUrl)
+  .pipe(
+    map(products => products.map(product => ({
+      ...product,
+      price: product.price * 1.5,
+      searchKey: [product.productName]
+    }) as Product)),tap(data => console.log('Products: ', JSON.stringify(data))),
+    catchError(this.handleError)
+  );
+
+  productsWithCategory$ = combineLatest(this.products$, this.productCategoryService.productCategories$)
+  .pipe(
+    map(([products,categories]) => products.map(product => ({
+      ...product,
+      price: product.price * 1.5,
+      category: categories.find(c => product.categoryId === c.id).name,
+      searchKey: [product.productName]
+    }) as Product)),tap(data => console.log('Products: ', JSON.stringify(data))),
+    catchError(this.handleError)
+  );
 
   constructor(private http: HttpClient,
-              private supplierService: SupplierService) { }
-
-  getProducts(): Observable<Product[]> {
-    return this.http.get<Product[]>(this.productsUrl)
-      .pipe(
-        tap(data => console.log('Products: ', JSON.stringify(data))),
-        catchError(this.handleError)
-      );
-  }
+              private supplierService: SupplierService,
+              private productCategoryService: ProductCategoryService
+              ) { }
 
   private fakeProduct(): Product {
     return {
